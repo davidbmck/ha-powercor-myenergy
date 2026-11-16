@@ -1,20 +1,20 @@
 {
   "domain": "powercor_myenergy",
   "name": "Powercor / CitiPower myEnergy",
+  "categories": [
+    "energy"
+  ],
   "codeowners": [
     "@davidbmck"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/davidbmck/ha-powercor-myenergy",
   "dependencies": [
     "recorder"
   ],
+  "documentation": "https://github.com/davidbmck/ha-powercor-myenergy",
+  "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/davidbmck/ha-powercor-myenergy/issues",
   "requirements": [],
-  "version": "0.2.0",
-  "categories": [
-    "energy"
-  ],
-  "integration_type": "hub"
+  "version": "0.2.0"
 }

@@ -4,6 +4,16 @@ The repository starts from reviewed source with a fresh Git history. Previous
 development history, discussions and private audit evidence are not included.
 Only GitHub no-reply attribution is used for its commits.
 
+Validated during preparation: 62 standalone tests and 25 artifact-based
+integration/Recorder tests on both HA 2026.10.4 and 2026.11.1. The generated
+archive has a flat component layout and reproducible bytes. The initial
+history, source and artifact have passed secret scans and manual privacy
+checks. Test containers were removed after each run.
+
+The HACS Action refuses to validate private repositories. Its final validation
+therefore requires owner approval to make this reviewed repository public;
+do not skip the check or publish the release before it passes.
+
 Before publication:
 
 - Run standalone and artifact-based HA/Recorder tests on the declared minimum

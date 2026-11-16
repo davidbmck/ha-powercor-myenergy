@@ -17,6 +17,7 @@ from .myenergy import AuthenticationError, MailboxError, MyEnergyError, Transpor
 from .statistics import AEST, async_import_history
 
 PLATFORMS = [Platform.SENSOR]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass, config):
