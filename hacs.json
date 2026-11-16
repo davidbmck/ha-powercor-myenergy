@@ -1,0 +1,8 @@
+{
+  "name": "Powercor / CitiPower myEnergy",
+  "country": "AU",
+  "homeassistant": "2026.10.4",
+  "zip_release": true,
+  "filename": "powercor_myenergy.zip",
+  "hide_default_branch": true
+}

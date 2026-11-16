@@ -1,0 +1,49 @@
+{
+  "title": "Powercor / CitiPower myEnergy",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to myEnergy",
+        "description": "Use your myEnergy login. Automatic verification requires a dedicated IMAP mailbox that receives your codes.",
+        "data": {
+          "username": "myEnergy email",
+          "password": "myEnergy password",
+          "automatic_login": "Retrieve email verification codes automatically"
+        }
+      },
+      "mailbox": {
+        "title": "Verification mailbox",
+        "description": "Use a dedicated inbox. For Gmail, enter an app password without spaces. Codes are used only to complete login.",
+        "data": {
+          "host": "IMAP server",
+          "username": "Mailbox login",
+          "password": "Mailbox app password",
+          "folder": "Mail folder",
+          "sender": "Exact verification email sender",
+          "recipient": "Exact verification email recipient",
+          "subject": "Subject template (replace the six digits with {code})"
+        }
+      },
+      "otp": {
+        "title": "Email verification",
+        "description": "Enter the code just sent by myEnergy. It is used once and is not saved.",
+        "data": {
+          "code": "Verification code"
+        }
+      }
+    },
+    "progress": {
+      "login": "Signing in and waiting for a fresh verification email. This can take up to two minutes."
+    },
+    "error": {
+      "invalid_auth": "Login or verification failed. Check your credentials and start again.",
+      "cannot_connect": "Unable to connect. Try again later.",
+      "mailbox_error": "Unable to retrieve a fresh verification code. Check the mailbox settings or return to setup and choose manual verification.",
+      "unexpected_response": "myEnergy returned an unexpected response. Check for an integration update."
+    },
+    "abort": {
+      "already_configured": "This myEnergy account is already configured.",
+      "wrong_account": "Use the same myEnergy account when reauthenticating."
+    }
+  }
+}

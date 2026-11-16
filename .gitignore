@@ -1,0 +1,36 @@
+# Local network captures and common exports
+captures/
+*.har
+*.har.gz
+
+# Local session/config files
+/secrets.json
+*secrets*.json
+*credentials*.json
+/login.json
+/imap.json
+/session*.json
+.env
+.env.*
+!.env.example
+*.cookie
+*.cookies
+*.cookies.json
+*cookie-state*.json
+*request-template*.json
+*.key
+*.p12
+*.pfx
+
+# Private development inputs, HA storage, logs and generated release files
+/private/
+/audit-private/
+/ha-config/
+/artifacts/
+/dist/
+*.log
+*.jsonl
+
+# Python probe/test bytecode
+__pycache__/
+*.pyc

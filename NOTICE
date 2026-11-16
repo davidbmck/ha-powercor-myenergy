@@ -1,0 +1,21 @@
+The project source is licensed under the MIT License; see LICENSE.
+
+custom_components/powercor_myenergy/intermediate.pem is the public DigiCert
+Global G2 TLS RSA SHA256 2020 CA1 intermediate certificate, issued by DigiCert
+Global Root G2. It contains a CA public key and signature, no private key or
+customer certificate. The project does not claim authorship of this certificate
+or purport to relicense DigiCert's material under MIT.
+
+Official source:
+https://cacerts.digicert.com/DigiCertGlobalG2TLSRSASHA2562020CA1-1.crt.pem
+
+SHA-256 certificate fingerprint:
+C8:02:5F:9F:C6:5F:DF:C9:5B:3C:A8:CC:78:67:B9:A5:87:B5:27:79:73:95:79:17:46:3F:C8:13:D0:B6:25:A9
+
+The bundled certificate was compared in DER form with the official download
+and verified against the system root store during the release privacy audit.
+Normal TLS certificate and hostname verification remain enabled.
+
+custom_components/powercor_myenergy/brand/icon.png is original geometric
+artwork created for this independent integration and covered by LICENSE.
+It does not reproduce distributor or Home Assistant branding.

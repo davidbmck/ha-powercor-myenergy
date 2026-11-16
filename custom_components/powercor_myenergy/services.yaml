@@ -1,0 +1,15 @@
+import_history:
+  name: Import historical readings
+  description: Import or reconcile complete historical AEST dates as hourly energy statistics.
+  fields:
+    start_date:
+      required: true
+      selector:
+        date:
+    end_date:
+      required: true
+      selector:
+        date:
+    config_entry_id:
+      selector:
+        text:
