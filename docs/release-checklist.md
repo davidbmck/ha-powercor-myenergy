@@ -1,36 +1,34 @@
-# First public release
+# Release validation
 
-The repository starts from reviewed source with a fresh Git history. Previous
-development history, discussions and private audit evidence are not included.
-Only GitHub no-reply attribution is used for its commits.
+Release [0.2.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.2.0)
+was published with owner approval after
+[all validation jobs passed](https://github.com/davidbmck/ha-powercor-myenergy/actions/runs/43851661592).
+No HACS checks were ignored.
 
-Validated during preparation: 62 standalone tests and 25 artifact-based
-integration/Recorder tests on both HA 2026.10.4 and 2026.11.1. The generated
-archive has a flat component layout and reproducible bytes. The initial
-history, source and artifact have passed secret scans and manual privacy
-checks. Test containers were removed after each run.
+Verified:
 
-The HACS Action refuses to validate private repositories. Its final validation
-therefore requires owner approval to make this reviewed repository public;
-do not skip the check or publish the release before it passes.
+- 62 standalone tests and 25 artifact-based HA/Recorder tests on each of
+  HA 2026.10.4 and 2026.11.1.
+- Reproducible flat release ZIP, matching manifest/tag, bundled client,
+  translations, public CA, original icon and license notices.
+- Fresh repository history and actual GitHub asset scanned for secrets and
+  manually checked for identifying data; no old development refs imported.
+- Actual previous manual build upgraded to the new artifact with synthetic
+  configuration, credentials/session, sensor identities and stored history
+  preserved across a process restart without another login.
+- Published repository registration, ZIP download, runtime imports and repeated
+  installation through the native Marketplace and legacy HACS 2.0.5 installer
+  APIs. Reinstallation replaced stale component files; HA state outside the
+  component folder remained intact. These were installer API checks, not a
+  visual walkthrough of the store or GitHub authorisation screens.
+- All disposable test containers and temporary remote files removed.
 
-Before publication:
+No live portal or mailbox credentials were used for release validation.
+The seven-day renewal observation and earlier live authentication checks do
+not establish long-term reliability. Default catalogue submission is separate.
 
-- Run standalone and artifact-based HA/Recorder tests on the declared minimum
-  and current stable versions. Validate manual and automatic setup, separate
-  mailbox credentials, reauthentication, restart and upgrade with existing
-  configuration and statistics.
-- Require passing hassfest and HACS Action without ignored checks. Inspect the
-  generated ZIP, manifest/tag alignment, certificate and original brand icon.
-- Re-scan every reachable ref and the actual artifact with a secret scanner
-  and manually inspect for identifiers, private infrastructure and readings.
-- Obtain owner approval before making the repository public or publishing a
-  GitHub release. Publish tag `0.2.0` with `powercor_myenergy.zip` attached;
-  every release must retain root `hacs.json`.
-- Verify clean installation and update from the published Marketplace/HACS
-  repository link. Remove the preparation notice from README only when this
-  path is available and tested.
-
-Default catalogue submission is a separate task and does not delay the first
-installable public release. Keep the previous repository private; never merge
-or push its refs into this repository.
+For later releases, repeat the relevant offline/upgrade checks, validate the
+manifest/tag and attached ZIP, run hassfest and HACS Action without ignored
+checks, inspect the actual artifact for sensitive data, and obtain owner
+approval before publishing. Every release must retain root `hacs.json`.
+Never import refs or discussions from the private development archive.

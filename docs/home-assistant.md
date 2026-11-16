@@ -105,16 +105,13 @@ completion, failure or a handled interruption. Live checks report outcomes only.
 They supplement the deterministic tests and do not establish long-term service
 reliability.
 
-Before rolling sync was added, validation on HA 2026.10.4 passed 59 standalone
-tests and 13 HA boundary tests,
-including a synthetic Recorder import whose hourly sums and energy metadata
-matched the source intervals. One live run completed two fresh automatic logins,
-protected discovery, recovery, a complete historical day whose stored hourly
-changes and totals matched the original myEnergy intervals, and a restart that
-reused the saved session. The disposable container was removed. No extended
-reliability trial was run.
+Release 0.2.0 passed 62 standalone tests and 25 artifact-based HA/Recorder tests
+on both HA 2026.10.4 and 2026.11.1. A previous manual build was upgraded with
+synthetic configuration and history preserved. Native Marketplace and legacy
+HACS installer checks downloaded and installed the published ZIP, then replaced
+it successfully. See the [release validation record](release-checklist.md).
 
-The rolling sync and reconciliation changes passed 23 offline HA tests and 59
-standalone tests in disposable containers. A new live check passed fresh
-automatic login, lost-session recovery, diagnostic status, daily Recorder
-energy compared with source intervals, and restart without another login.
+Earlier private live checks exercised fresh manual/automatic authentication,
+lost-session recovery, historical daily energy compared with source intervals,
+and restart with session reuse. They were not repeated for this release and
+do not establish long-term unattended reliability.

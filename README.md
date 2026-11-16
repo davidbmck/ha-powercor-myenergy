@@ -7,14 +7,17 @@ Home Assistant integration for retrospective electricity readings from the
 consumption and solar export into the Energy dashboard. This is interval data,
 not real-time power monitoring.
 
-**Release preparation:** the first public release is not published yet.
-Marketplace and HACS installation becomes available after publication.
+Install [release 0.2.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.2.0)
+as a custom repository. Default catalogue listing is a separate follow-up.
+
+[![Open in Marketplace or HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=davidbmck&repository=ha-powercor-myenergy&category=integration)
 
 ## Install and set up
 
 Requires Home Assistant **2026.10.4 or newer** and a myEnergy account with access
 to the supply point. The built-in Marketplace requires HA 2026.11 or newer;
-legacy HACS can use the same release ZIP.
+legacy HACS can use the same release ZIP. Connect GitHub in Marketplace/HACS
+when prompted; custom repository installation and update checks require it.
 
 1. In **Settings → Marketplace**, add
    [this repository](https://github.com/davidbmck/ha-powercor-myenergy) from its
