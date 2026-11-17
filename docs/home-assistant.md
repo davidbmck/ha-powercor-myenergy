@@ -12,8 +12,10 @@ component. Restart HA after first installation, then add **Powercor / CitiPower
 myEnergy** under **Settings → Devices & services**. Supply the myEnergy login
 and choose manual email verification or optional automatic verification.
 For automatic verification, use a dedicated IMAP inbox receiving
-the codes directly; Gmail requires an app password. The server, mailbox login,
-recipient and subject defaults are editable. A separate mailbox login and
+the codes directly; Gmail requires an app password. The sender defaults to the
+observed service address, `no-reply@powercor.com.au`; enter the recipient address
+exactly as it appears in the verification email's To header. The server, mailbox
+login, sender and subject defaults are editable. A separate mailbox login and
 non-Gmail IMAP providers using verified TLS on port 993 are supported by the
 configuration; live checks have only established the documented Gmail path.
 Credentials and reusable
