@@ -239,6 +239,24 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
                 await coordinator._async_update_data()
         self.client.login.assert_not_called()
 
+    async def test_mailbox_defaults_use_service_sender_and_require_recipient(self):
+        flow = MyEnergyConfigFlow()
+        flow.hass = self.hass
+        flow._data = dict(LOGIN)
+        result = await flow.async_step_mailbox()
+        defaults = {key.schema: key.default() for key in result["data_schema"].schema
+                    if key.schema in ("sender", "recipient")}
+        self.assertEqual(defaults, {"sender": "no-reply@powercor.com.au", "recipient": ""})
+
+    async def test_mailbox_form_preserves_previous_addresses(self):
+        flow = MyEnergyConfigFlow()
+        flow.hass = self.hass
+        flow._data = {**LOGIN, "imap": MAILBOX}
+        result = await flow.async_step_mailbox()
+        defaults = {key.schema: key.default() for key in result["data_schema"].schema
+                    if key.schema in ("sender", "recipient")}
+        self.assertEqual(defaults, {key: MAILBOX[key] for key in ("sender", "recipient")})
+
     async def test_manual_flow_keeps_code_out_of_entry_and_closes_session(self):
         flow = MyEnergyConfigFlow()
         flow.hass = self.hass
