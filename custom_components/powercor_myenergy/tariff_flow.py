@@ -15,6 +15,7 @@ TEXT = selector.TextSelector()
 BOOL = selector.BooleanSelector()
 DATE = selector.DateSelector()
 TIME = selector.TimeSelector()
+CLOCKS = {"victorian": "Australia/Melbourne", "aest": "Etc/GMT-10"}
 
 
 def select(values, key):
@@ -115,7 +116,7 @@ class TariffOptionsFlow(OptionsFlow):
         if user_input is not None:
             model = user_input["model"]
             self._plan = {**deepcopy(old), "model": model, "export_model": user_input["export_model"],
-                          "timezone": user_input["timezone"], "effective_date": old.get("effective_date")}
+                          "timezone": CLOCKS[user_input["timezone"]], "effective_date": old.get("effective_date")}
             if model != old.get("model"):
                 self._plan["bands"] = preset(model)
                 self._plan.pop("import_block", None)
@@ -130,7 +131,7 @@ class TariffOptionsFlow(OptionsFlow):
         schema = {
             vol.Required("model", default=old.get("model", "flat")): select(list(MODELS), "model"),
             vol.Required("export_model", default=old.get("export_model", "none")): select(["none", "flat", "block"], "export_model"),
-            vol.Required("timezone", default=old.get("timezone", "Australia/Melbourne")): select(["Australia/Melbourne", "Etc/GMT-10"], "timezone"),
+            vol.Required("timezone", default="aest" if old.get("timezone") == "Etc/GMT-10" else "victorian"): select(list(CLOCKS), "timezone"),
             vol.Required("customise_times", default=False): BOOL,
             vol.Required("extras", default=bool(old.get("controlled_load_price") is not None or old.get("extra_overnight"))): BOOL,
         }

@@ -169,8 +169,8 @@
     },
     "timezone": {
       "options": {
-        "Australia/Melbourne": "Victorian local time (follows daylight saving)",
-        "Etc/GMT-10": "Fixed AEST (no daylight saving)"
+        "victorian": "Victorian local time (follows daylight saving)",
+        "aest": "Fixed AEST (no daylight saving)"
       }
     },
     "reset": {

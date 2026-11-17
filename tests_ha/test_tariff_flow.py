@@ -35,7 +35,7 @@ class TariffFlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def choose(self, flow_id, **extra):
         return await self.hass.config_entries.options.async_configure(flow_id, {
-            "model": "flat", "export_model": "none", "timezone": "Australia/Melbourne",
+            "model": "flat", "export_model": "none", "timezone": "victorian",
             "customise_times": False, "extras": False, **extra,
         })
 
