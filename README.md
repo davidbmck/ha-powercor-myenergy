@@ -7,7 +7,7 @@ Home Assistant integration for retrospective electricity readings from the
 consumption and solar export into the Energy dashboard. This is interval data,
 not real-time power monitoring.
 
-Install [release 0.2.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.2.0)
+Install [release 0.3.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.3.0)
 as a custom repository. Default catalogue listing is a separate follow-up.
 
 [![Open in Marketplace or HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=davidbmck&repository=ha-powercor-myenergy&category=integration)
@@ -59,8 +59,13 @@ under **Developer tools → Actions**. Enter inclusive completed dates in fixed
 
 Incomplete hours are omitted rather than filled with zero. An hour previously
 imported that later becomes incomplete remains in Recorder. Controlled-load
-suffixes are not inferred automatically. Tariffs and billing are outside this
-integration's scope.
+suffixes are not inferred automatically. Optional usage-cost tracking supports
+flat prices, time-of-use/free-midday/overnight schedules and two-block import or
+export pricing. Configure dated prices through the integration's **Configure**
+options; see [usage costs and price changes](docs/home-assistant.md#usage-costs-and-export-credits).
+The native Energy static-price option remains disabled for external statistics;
+select the integration's matching cost/credit statistics instead. Full bill
+calculation, including supply fees and demand charges, is outside scope.
 
 ## Updates and migration
 
@@ -103,7 +108,7 @@ established. The portal uses undocumented behaviour that can change.
 ## Development
 
 Install `requirements.txt`, then run `python -m unittest discover -s tests`.
-`python tools/build_release.py --tag 0.2.0` produces the self-contained release
+`python tools/build_release.py --tag 0.3.0` produces the self-contained release
 ZIP. `python tools/test_ha.py --image <installed-image>` runs offline HA and
 Recorder checks from that artifact in a disposable Docker container. See
 [developer validation](docs/home-assistant.md#disposable-docker-validation).

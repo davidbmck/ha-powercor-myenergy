@@ -11,7 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.start import async_at_started
 
-from .const import CONF_RETRY_START, DOMAIN, MAX_SYNC_DAYS
+from .const import CONF_LAST_SYNC, CONF_RETRY_START, DOMAIN, MAX_SYNC_DAYS
 from .coordinator import MyEnergyCoordinator, async_create_session
 from .myenergy import AuthenticationError, MailboxError, MyEnergyError, TransportError
 from .statistics import AEST, async_import_history
@@ -74,6 +74,20 @@ async def async_setup_entry(hass, entry):
     async def refresh_after_start(started_hass):
         await coordinator.async_request_refresh()
 
+    previous_options = dict(entry.options)
+
+    async def options_updated(hass, updated_entry):
+        nonlocal previous_options
+        if updated_entry.options == previous_options:
+            return
+        previous_options = dict(updated_entry.options)
+        async with coordinator.sync_lock:
+            saved = dict(updated_entry.data)
+            saved.pop(CONF_LAST_SYNC, None)
+            hass.config_entries.async_update_entry(updated_entry, data=saved)
+        await coordinator.async_request_refresh()
+
+    entry.async_on_unload(entry.add_update_listener(options_updated))
     entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, close_session))
     try:
         await coordinator.async_config_entry_first_refresh()

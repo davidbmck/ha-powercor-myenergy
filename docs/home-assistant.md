@@ -12,8 +12,10 @@ component. Restart HA after first installation, then add **Powercor / CitiPower
 myEnergy** under **Settings → Devices & services**. Supply the myEnergy login
 and choose manual email verification or optional automatic verification.
 For automatic verification, use a dedicated IMAP inbox receiving
-the codes directly; Gmail requires an app password. The server, mailbox login,
-recipient and subject defaults are editable. A separate mailbox login and
+the codes directly; Gmail requires an app password. The sender defaults to the
+observed service address, `no-reply@powercor.com.au`; enter the recipient address
+exactly as it appears in the verification email's To header. The server, mailbox
+login, sender and subject defaults are editable. A separate mailbox login and
 non-Gmail IMAP providers using verified TLS on port 993 are supported by the
 configuration; live checks have only established the documented Gmail path.
 Credentials and reusable
@@ -79,6 +81,105 @@ does not queue new rows. Revised or newly available complete hours are inserted
 and later cumulative sums are adjusted. Hours that become incomplete are left
 untouched because Recorder has no per-hour deletion through this import API.
 
+## Usage costs and export credits
+
+HA disables its native **Use a static price** option for external energy
+statistics: that calculation needs a sensor entity. Instead, open this
+integration's **Configure** options in **Settings → Devices & services**.
+Enter the import price and optional export credit in HA's configured currency
+per kWh, then save. For AUD, enter `0.30` for 30 c/kWh. A flat-rate setup takes
+one form submission. Zero is a valid price; leave unused export pricing blank.
+
+To raise prices or change provider, reopen Configure. Current prices are
+prefilled, including any peak, shoulder, overnight and second-block prices.
+Change the amounts and **New prices start on**, then save. Hours and allowances
+stay unchanged. The date defaults to tomorrow, or the day after the last
+scheduled change. Earlier readings keep their saved prices, even when they
+arrive late. The first plan covers all historical imports; enter historical
+changes in date order if reconstructing earlier bills.
+
+Enable **Change plan type, hours or special settings** only when those details
+change. Presets provide editable examples, with no assumed retailer prices:
+
+| Import model | Example periods |
+| --- | --- |
+| Flat | One price all day |
+| Peak / off-peak | Peak 16:00–21:00 daily; off-peak otherwise |
+| Peak / shoulder / off-peak | Weekday peak 15:00–21:00; shoulder 07:00–22:00 outside peak, including weekends |
+| Free midday | Free 11:00–14:00; standard price otherwise; edit the end to 15:00 for a four-hour window |
+| Midday Power Saver | Free 11:00–14:00, solar soak 14:00–16:00, peak 16:00–21:00, off-peak otherwise |
+| Overnight / EV | Cheap 00:00–06:00; standard price otherwise |
+| Two blocks | First Y kWh at the import price, remainder at the second price |
+
+Match your bill's hours, weekdays and clock: Victorian local time follows DST;
+fixed AEST does not. Windows end exclusively and may wrap midnight. Free,
+peak and shoulder are checked in that order, allowing peak inside a broader
+shoulder window. An optional extra overnight window overrides them, so keep it
+separate from free hours. Five-minute time boundaries are accepted, but a
+boundary inside a longer source interval is rejected rather than estimating
+how energy was split. Different summer/winter prices can use dated plans.
+
+Export credits support a fixed rate or two blocks. Block allowances reset at
+local midnight daily, or every one/three calendar months from the entered
+billing-cycle date. Month-end anchors clamp without drifting. An allowance is
+shared across one meter's channels of the same direction; separate meters do
+not pool allowances. Each hour's combined charge is split between those
+channels in proportion to their kWh, including when their interval lengths
+differ. Price changes keep counting usage from the cycle start.
+Block import pricing cannot also use time bands. This is a two-block model,
+not a free-window usage cap or a multi-tier billing engine.
+
+Optional controlled-load pricing requires an explicitly confirmed NEM12
+register (E2–E9); obtain it from your export or distributor. No register is
+assumed to be controlled load. The general import rate never prices that
+channel. A separate controlled-load price is flat per kWh.
+
+After an import, select the matching **myEnergy … cost** statistic using
+**Use an entity tracking the total costs** in Energy grid consumption settings,
+and **myEnergy export credit …** for return-to-grid compensation. These are
+external statistics despite HA's option wording. Select each matching pair
+when there are multiple streams. Credits are positive amounts, which HA
+subtracts from import costs.
+
+Time-of-use costs apply prices to original intervals before grouping complete
+UTC hours. Two-block costs use complete hourly meter totals; their prices and
+reset boundaries are constant within an hour, preserving the exact combined
+charge. Neither uses today's sensor state. Reimporting unchanged readings,
+including after restart, adds no costs. Corrections repair later running sums
+and reprice later dated plans when they still share the affected allowance.
+
+A block import retrieves the affected billing cycles in requests of at most
+30 AEST days, capped at yesterday, so it can exceed the normal rolling window.
+Only the affected periods for each direction are reconciled: extra NEM-day
+padding needed to retrieve them is not imported or counted as a gap. Retired
+pricing calendars do not expand current imports. Missing earlier cycle data
+withholds costs only when their applicable price remains unknown; already
+exhausted allowances and equal-price blocks can still be priced. The
+`unpriced_hours` diagnostic reports complete energy hours awaiting a price.
+Previously imported hours that become incomplete stay untouched.
+
+Upgrading from 0.2.0 preserves the existing entry, credentials and energy
+statistics; no entry recreation or data migration is needed. Adding pricing is
+optional. Saving prices requests a recent reconciliation. To cost already imported
+older history or apply an intentional historical correction, run the history
+import action for those dates; the original intervals must still be available
+from myEnergy. Choose **Correct prices in a saved historical
+period** to edit a saved plan; it requires confirmation and preserves its
+original boundaries. Later saved plans stay intact. Keep previously enabled
+export/controlled-load pricing when correcting a period; use zero for a
+zero-priced period. Existing money statistics cannot be relabelled if HA's
+currency changes; restore that currency before importing or editing prices.
+
+These statistics track usage costs and export credits. They exclude daily
+supply fees, demand charges, discounts, wholesale prices, public-holiday
+calendars, and retailer-specific caps. They are not a full bill calculation.
+Presets are based on published [Victorian Midday Power Saver](https://www.energy.vic.gov.au/households/save-energy-and-money/victorian-midday-power-saver),
+[flexible pricing](https://www.energyaustralia.com.au/what-are-flexible-pricing-plans),
+and [overnight EV](https://help.ovoenergy.com.au/electric-vehicles/) examples;
+retailer periods and conditions vary. See the government's
+[tariff guide](https://www.energy.gov.au/solar/financial-benefits-solar/electricity-pricing-plans-and-tariffs)
+for the distinction between usage and other charges.
+
 ## Disposable Docker validation
 
 On a Docker host with the HA image already installed:
@@ -104,6 +205,12 @@ and temporary HA storage in memory. The container and its state are removed on
 completion, failure or a handled interruption. Live checks report outcomes only.
 They supplement the deterministic tests and do not establish long-term service
 reliability.
+
+Cost tracking passed 78 standalone tests and 38 artifact-based HA/Recorder
+checks on HA 2026.10.4 and 2026.11.1. An offline upgrade from the published
+0.2.0 ZIP preserved the config entry, credentials and every synthetic energy
+row, added retrospective import costs/export credits, and survived a further
+restart with repeated imports unchanged. These checks used no live account.
 
 Release 0.2.0 passed 62 standalone tests and 25 artifact-based HA/Recorder tests
 on both HA 2026.10.4 and 2026.11.1. A previous manual build was upgraded with

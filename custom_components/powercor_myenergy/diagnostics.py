@@ -16,5 +16,6 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "sync_complete": data.get("sync_complete"),
         "skipped_meters": data.get("skipped_meters"),
         "incomplete_hours": data.get("incomplete_hours"),
+        "unpriced_hours": data.get("unpriced_hours"),
         "unresolved_history_start": data.get("unresolved_history_start"),
     }

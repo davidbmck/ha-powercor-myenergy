@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 
 from .const import CONF_AUTOMATIC, CONF_IMAP, CONF_SESSION, DOMAIN
 from .coordinator import async_create_session
+from .tariff_flow import TariffOptionsFlow
 from .myenergy import (
     AuthenticationError, MailboxError, MyEnergyClient, MyEnergyError, TransportError,
 )
@@ -22,6 +23,11 @@ PASSWORD = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextS
 
 class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return TariffOptionsFlow()
 
     def __init__(self):
         self._data = {}
@@ -96,7 +102,7 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
         previous = self._data.get(CONF_IMAP, {})
         defaults = {
             "host": "imap.gmail.com", "username": self._data.get(CONF_USERNAME, ""),
-            "folder": "INBOX", "sender": "", "recipient": self._data.get(CONF_USERNAME, ""),
+            "folder": "INBOX", "sender": "no-reply@powercor.com.au", "recipient": "",
             "subject": "{code} is your one-time verification code.",
         }
         schema = {}

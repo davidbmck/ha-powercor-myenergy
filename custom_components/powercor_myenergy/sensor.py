@@ -32,7 +32,7 @@ class LastUpdateSensor(CoordinatorEntity, SensorEntity):
         data = self.coordinator.data
         return {key: data.get(key) for key in (
             "last_successful_sync", "sync_complete", "skipped_meters", "incomplete_hours",
-            "unresolved_history_start",
+            "unresolved_history_start", "unpriced_hours",
         )}
 
 
