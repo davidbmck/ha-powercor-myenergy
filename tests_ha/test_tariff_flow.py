@@ -135,3 +135,58 @@ class TariffFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan["bands"][0]["price"], "0.08")
         self.assertEqual(plan["bands"][1]["end"], "15:00:00")
         self.assertEqual(plan["controlled_load_price"], "0.10")
+
+    async def test_every_import_preset_can_be_saved_through_the_actual_forms(self):
+        from custom_components.powercor_myenergy.tariff import MODELS
+        prices = {
+            "two_rate": {"peak_price": "0.50"},
+            "three_rate": {"peak_price": "0.50", "shoulder_price": "0.30"},
+            "midday_saver": {"peak_price": "0.50", "shoulder_price": "0.15"},
+            "overnight": {"overnight_price": "0.08"},
+            "block": {"import_block_kwh": "10", "import_after_price": "0.40",
+                      "import_reset": "daily", "import_anchor": "2026-01-01"},
+        }
+        for model in MODELS:
+            with self.subTest(model=model):
+                self.hass.config_entries.async_update_entry(self.entry, options={})
+                result = await self.start()
+                result = await self.hass.config_entries.options.async_configure(result["flow_id"], {
+                    "import_price": "0.30", "advanced": True})
+                result = await self.choose(result["flow_id"], model=model)
+                if model in prices:
+                    result = await self.hass.config_entries.options.async_configure(result["flow_id"], prices[model])
+                self.assertEqual(result["type"], "create_entry")
+                plan = self.entry.options["tariff"]["plans"][0]
+                self.assertNotIn("overnight_price", plan)
+                self.assertNotIn("extra_overnight", plan)
+                if model == "free_midday":
+                    self.assertEqual(plan["bands"][0]["price"], "0")
+
+    async def test_switching_export_blocks_to_flat_removes_inactive_tier_prices(self):
+        from datetime import timezone
+        from decimal import Decimal
+        from custom_components.powercor_myenergy.tariff import hourly_costs
+        from custom_components.powercor_myenergy.hourly import hourly_energy
+        from custom_components.powercor_myenergy.myenergy.model import Channel, ChannelKind, Reading
+
+        result = await self.start()
+        result = await self.hass.config_entries.options.async_configure(result["flow_id"], {
+            "import_price": "0.30", "export_price": "0.10", "advanced": True})
+        result = await self.choose(result["flow_id"], export_model="block")
+        await self.hass.config_entries.options.async_configure(result["flow_id"], {
+            "export_block_kwh": "1", "export_after_price": "0.01",
+            "export_reset": "daily", "export_anchor": "2026-01-01"})
+        result = await self.start()
+        defaults = {key.schema: key.default() for key in result["data_schema"].schema}
+        result = await self.hass.config_entries.options.async_configure(result["flow_id"], {
+            "import_price": "0.30", "export_price": "0.10", "advanced": True,
+            "effective_date": defaults["effective_date"], "operation": "new"})
+        result = await self.choose(result["flow_id"], export_model="flat")
+        self.assertEqual(result["type"], "create_entry")
+        plan = self.entry.options["tariff"]["plans"][-1]
+        self.assertNotIn("export_block", plan)
+        start = datetime.fromisoformat(plan["effective_from"]).astimezone(timezone.utc)
+        channel = Channel("meter-example", "channel-export", ChannelKind.GRID_EXPORT)
+        rows = [Reading(channel, start, start+timedelta(hours=1), Decimal(2))]
+        money = hourly_costs(rows, hourly_energy(rows), self.entry.options["tariff"])
+        self.assertEqual(money[channel][0][1], Decimal("0.20"))

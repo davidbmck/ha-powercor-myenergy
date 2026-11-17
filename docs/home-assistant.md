@@ -123,7 +123,9 @@ Export credits support a fixed rate or two blocks. Block allowances reset at
 local midnight daily, or every one/three calendar months from the entered
 billing-cycle date. Month-end anchors clamp without drifting. An allowance is
 shared across one meter's channels of the same direction; separate meters do
-not pool allowances. Price changes keep counting usage from the cycle start.
+not pool allowances. Each hour's combined charge is split between those
+channels in proportion to their kWh, including when their interval lengths
+differ. Price changes keep counting usage from the cycle start.
 Block import pricing cannot also use time bands. This is a two-block model,
 not a free-window usage cap or a multi-tier billing engine.
 
@@ -139,14 +141,22 @@ external statistics despite HA's option wording. Select each matching pair
 when there are multiple streams. Credits are positive amounts, which HA
 subtracts from import costs.
 
-Costs use the original interval kWh and timestamp before grouping complete
-UTC hours; they are not calculated from today's sensor state. Reimporting
-unchanged readings, including after restart, adds no costs. Corrections repair
-later running sums. A block import retrieves the affected billing cycles in
-requests of at most 30 AEST days, capped at yesterday, so it can exceed the
-normal rolling window. Missing earlier cycle data withholds costs whose block
-position is unknown; the `unpriced_hours` diagnostic reports these complete
-energy hours. Previously imported hours that become incomplete stay untouched.
+Time-of-use costs apply prices to original intervals before grouping complete
+UTC hours. Two-block costs use complete hourly meter totals; their prices and
+reset boundaries are constant within an hour, preserving the exact combined
+charge. Neither uses today's sensor state. Reimporting unchanged readings,
+including after restart, adds no costs. Corrections repair later running sums
+and reprice later dated plans when they still share the affected allowance.
+
+A block import retrieves the affected billing cycles in requests of at most
+30 AEST days, capped at yesterday, so it can exceed the normal rolling window.
+Only the affected periods for each direction are reconciled: extra NEM-day
+padding needed to retrieve them is not imported or counted as a gap. Retired
+pricing calendars do not expand current imports. Missing earlier cycle data
+withholds costs only when their applicable price remains unknown; already
+exhausted allowances and equal-price blocks can still be priced. The
+`unpriced_hours` diagnostic reports complete energy hours awaiting a price.
+Previously imported hours that become incomplete stay untouched.
 
 Upgrading from 0.2.0 preserves the existing entry, credentials and energy
 statistics; no entry recreation or data migration is needed. Adding pricing is
@@ -196,7 +206,7 @@ completion, failure or a handled interruption. Live checks report outcomes only.
 They supplement the deterministic tests and do not establish long-term service
 reliability.
 
-Cost tracking passed 73 standalone tests and 33 artifact-based HA/Recorder
+Cost tracking passed 78 standalone tests and 38 artifact-based HA/Recorder
 checks on HA 2026.10.4 and 2026.11.1. An offline upgrade from the published
 0.2.0 ZIP preserved the config entry, credentials and every synthetic energy
 row, added retrospective import costs/export credits, and survived a further

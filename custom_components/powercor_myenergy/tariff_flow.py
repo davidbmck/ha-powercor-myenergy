@@ -9,13 +9,12 @@ import voluptuous as vol
 from homeassistant.config_entries import OptionsFlow
 from homeassistant.helpers import selector
 
-from .tariff import ALL_DAYS, DAYS, MODELS, preset, price, validate_plan
+from .tariff import ALL_DAYS, CLOCKS, DAYS, MODELS, prepare_plan, preset, price, validate_plan
 
 TEXT = selector.TextSelector()
 BOOL = selector.BooleanSelector()
 DATE = selector.DateSelector()
 TIME = selector.TimeSelector()
-CLOCKS = {"victorian": "Australia/Melbourne", "aest": "Etc/GMT-10"}
 
 
 def select(values, key):
@@ -67,9 +66,6 @@ class TariffOptionsFlow(OptionsFlow):
                     for direction in ("import", "export"):
                         if block := self._plan.get(direction + "_block"):
                             block["after_price"] = user_input[direction + "_after_price"]
-                    for key in ("extra_overnight_price", "overnight_price"):
-                        if key in user_input:
-                            self._plan["extra_overnight" if key == "extra_overnight_price" else key] = user_input[key]
                     if "controlled_load_price" in user_input:
                         self._plan["controlled_load_price"] = user_input["controlled_load_price"]
                     if user_input["advanced"]:
@@ -120,8 +116,6 @@ class TariffOptionsFlow(OptionsFlow):
             if model != old.get("model"):
                 self._plan["bands"] = preset(model)
                 self._plan.pop("import_block", None)
-                if model == "block":
-                    self._plan.pop("extra_overnight", None)
             self._customise = user_input["customise_times"]
             self._extras = user_input["extras"]
             if (old.get("export_model", "none") != "none" and user_input["export_model"] == "none"):
@@ -133,7 +127,7 @@ class TariffOptionsFlow(OptionsFlow):
             vol.Required("export_model", default=old.get("export_model", "none")): select(["none", "flat", "block"], "export_model"),
             vol.Required("timezone", default="aest" if old.get("timezone") == "Etc/GMT-10" else "victorian"): select(list(CLOCKS), "timezone"),
             vol.Required("customise_times", default=False): BOOL,
-            vol.Required("extras", default=bool(old.get("controlled_load_price") is not None or old.get("extra_overnight"))): BOOL,
+            vol.Required("extras", default=bool(old.get("controlled_load_price") is not None or any(band["name"] == "extra_overnight" for band in old.get("bands", [])))): BOOL,
         }
         return self.async_show_form(step_id="add_plan", data_schema=vol.Schema(schema), errors=errors)
 
@@ -144,9 +138,12 @@ class TariffOptionsFlow(OptionsFlow):
                 for key, value in user_input.items():
                     if key.endswith("price") or key.endswith("kwh"):
                         price(value)
-                self._plan.update(user_input)
+                for key in ("import_price", "export_price"):
+                    if key in user_input:
+                        self._plan[key] = user_input[key]
                 for band in self._plan["bands"]:
-                    band["price"] = "0" if band["name"] == "free" else user_input.get(band["name"] + "_price", band.get("price", "0"))
+                    if band["name"] + "_price" in user_input:
+                        band["price"] = user_input[band["name"] + "_price"]
                 for direction in ("import", "export"):
                     block_key = direction + "_block"
                     if (direction == "import" and self._plan["model"] == "block" or
@@ -155,8 +152,6 @@ class TariffOptionsFlow(OptionsFlow):
                                                 "after_price": user_input[direction + "_after_price"],
                                                 "reset": user_input[direction + "_reset"],
                                                 "anchor": user_input.get(direction + "_anchor", "2026-01-01")}
-                    else:
-                        self._plan.pop(block_key, None)
                 for key in ("import_block", "export_block"):
                     if self._plan.get(key) and price(self._plan[key]["kwh"]) <= 0:
                         raise ValueError("invalid_block")
@@ -176,7 +171,8 @@ class TariffOptionsFlow(OptionsFlow):
             key = band["name"] + "_price"
             schema[vol.Required(key, default=band.get("price", ""))] = TEXT
         if self._plan["model"] == "overnight":
-            schema[vol.Required("overnight_price", default=self._plan.get("overnight_price", ""))] = TEXT
+            overnight = next(band for band in self._plan["bands"] if band["name"] == "overnight")
+            schema[vol.Required("overnight_price", default=overnight.get("price", ""))] = TEXT
         for direction in ("import", "export"):
             if ((direction == "import" and self._plan["model"] == "block") or
                     (direction == "export" and self._plan["export_model"] == "block")):
@@ -226,7 +222,6 @@ class TariffOptionsFlow(OptionsFlow):
             return await self.async_step_extras()
         self._plan.pop("controlled_load_price", None)
         self._plan.pop("controlled_load_register", None)
-        self._plan.pop("extra_overnight", None)
         self._plan["bands"] = [band for band in self._plan["bands"] if band["name"] != "extra_overnight"]
         return await self._async_finish()
 
@@ -244,11 +239,11 @@ class TariffOptionsFlow(OptionsFlow):
                     raise ValueError("Confirm the separately identified controlled-load register")
                 self._plan["controlled_load_register"] = register if controlled is not None else None
                 self._plan["bands"] = [band for band in self._plan["bands"] if band["name"] != "extra_overnight"]
-                self._plan["extra_overnight"] = user_input.get("extra_overnight_price") or None
-                if self._plan["extra_overnight"] is not None:
+                extra_price = user_input.get("extra_overnight_price") or None
+                if extra_price is not None:
                     if self._plan["model"] == "block":
                         raise ValueError("Block import prices cannot also have time bands")
-                    self._plan["bands"].insert(0, {"name": "extra_overnight", "price": self._plan["extra_overnight"],
+                    self._plan["bands"].insert(0, {"name": "extra_overnight", "price": extra_price,
                                                   "start": user_input["extra_overnight_start"],
                                                   "end": user_input["extra_overnight_end"], "days": ALL_DAYS})
                 validate_plan(self._plan)
@@ -259,17 +254,14 @@ class TariffOptionsFlow(OptionsFlow):
         return self.async_show_form(step_id="extras", data_schema=vol.Schema({
             vol.Optional("controlled_load_price", default=self._plan.get("controlled_load_price") or ""): TEXT,
             vol.Optional("controlled_load_register", default=self._plan.get("controlled_load_register") or ""): TEXT,
-            vol.Optional("extra_overnight_price", default=self._plan.get("extra_overnight") or ""): TEXT,
+            vol.Optional("extra_overnight_price", default=extra.get("price", "")): TEXT,
             vol.Required("extra_overnight_start", default=extra.get("start", "00:00:00")): TIME,
             vol.Required("extra_overnight_end", default=extra.get("end", "06:00:00")): TIME,
         }), errors=errors, description_placeholders={"currency": self.hass.config.currency})
 
     async def _async_finish(self):
-        try:
-            validate_plan(self._plan)
-        except ValueError:
-            return await self.async_step_rates()
         if self._edit is not None:
+            self._plan = prepare_plan(self._plan)
             return await self.async_step_confirm()
         return self._save()
 
@@ -282,12 +274,8 @@ class TariffOptionsFlow(OptionsFlow):
     def _save(self):
         # Store a complete version, not mutable shared defaults. HA persists options
         # across reauthentication and restart; no rolling consumption counter exists.
-        plan = {key: value for key, value in self._plan.items() if key in {
-            "model", "export_model", "timezone", "effective_date", "effective_from",
-            "import_price", "export_price", "bands", "import_block", "export_block",
-            "controlled_load_price", "controlled_load_register", "extra_overnight", "overnight_price",
-        }}
-        if self._edit is None or self._edit != 0:
+        plan = prepare_plan(self._plan)
+        if self._edit is None:
             if day := plan["effective_date"]:
                 plan["effective_from"] = datetime.combine(date.fromisoformat(day), time.min,
                                                          ZoneInfo(plan["timezone"])).astimezone(timezone.utc).isoformat()

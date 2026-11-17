@@ -393,6 +393,29 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["streams"], {})
         self.recorder.return_value.async_block_till_done.assert_not_awaited()
 
+    async def test_unavailable_context_does_not_mark_fully_priced_target_hours_missing(self):
+        self.hass.config.currency = "AUD"
+        before = {"effective_from": None, "timezone": "Australia/Melbourne", "bands": [],
+                  "import_price": "0.20", "export_price": None}
+        after = {**before, "effective_from": datetime(2026, 8, 1, tzinfo=AEST).isoformat(),
+                 "import_block": {"kwh": "2", "after_price": "0.20", "reset": "quarterly", "anchor": "2026-07-01"}}
+        self.entry.options = {"tariff": {"currency": "AUD", "plans": [before, after]}}
+        channel = Channel("meter-example", "a" * 64, ChannelKind.GRID_IMPORT)
+        async def source(meter, first, last):
+            if first == date(2026, 7, 1):
+                raise DataUnavailable()
+            start = datetime.combine(first, datetime.min.time(), AEST)
+            return [Reading(channel, start+i*timedelta(hours=1), start+(i+1)*timedelta(hours=1), Decimal(1))
+                    for i in range(((last-first).days+1)*24)]
+        self.client.get_readings = AsyncMock(side_effect=source)
+        with (patch(f"{PREFIX}.statistics.async_list_statistic_ids", new_callable=AsyncMock, return_value=[]),
+              patch(f"{PREFIX}.statistics.async_add_external_statistics")):
+            result = await async_import_history(self.hass, self.coordinator(), date(2026, 8, 10), date(2026, 8, 10))
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["skipped_meters"], 0)
+        self.assertEqual(result["unpriced_hours"], 0)
+        self.assertEqual(next(iter(result["streams"].values()))["hours"], 61*24)
+
     async def test_cost_currency_or_existing_units_mismatch_prevents_all_writes(self):
         self.hass.config.currency = "AUD"
         self.entry.options = {"tariff": {"currency": "EUR", "plans": []}}

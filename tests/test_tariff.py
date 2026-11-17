@@ -33,6 +33,10 @@ def settings(model="flat", **overrides):
     for band in plan["bands"]:
         band["price"] = {"free": "0", "peak": "0.50", "shoulder": "0.30", "overnight": "0.08"}[band["name"]]
     plan.update(overrides)
+    plan["effective_date"] = None
+    plan["export_model"] = "block" if plan.get("export_block") else "flat" if plan.get("export_price") is not None else "none"
+    if plan.get("import_block"):
+        plan["model"] = "block"
     return {"currency": "AUD", "plans": [plan]}
 
 
@@ -102,7 +106,7 @@ class TariffTests(unittest.TestCase):
         self.assertEqual(tariff.period_bounds(date(2026, 2, 28), monthly), (date(2026, 2, 28), date(2026, 3, 31)))
         quarterly = block("quarterly", "2025-11-30")
         self.assertEqual(tariff.period_bounds(date(2026, 3, 1), quarterly), (date(2026, 2, 28), date(2026, 5, 30)))
-        self.assertEqual(tariff.request_dates(settings(import_block=monthly), date(2026, 3, 10), date(2026, 3, 11), date(2026, 4, 15)),
+        self.assertEqual(tariff.history_periods(settings(import_block=monthly), date(2026, 3, 10), date(2026, 3, 11), date(2026, 4, 15))[:2],
                          (date(2026, 2, 27), date(2026, 3, 30)))
 
     def test_block_corrections_reprice_later_intervals_and_midcycle_rate_change_keeps_usage(self):
@@ -145,6 +149,66 @@ class TariffTests(unittest.TestCase):
                 amounts = cost(rows, settings(import_block=block()))[IMPORT]
                 self.assertEqual(sum(value for _, value in amounts[:-1]), Decimal("0.40") + Decimal("0.40") * (count - 2))
                 self.assertEqual(amounts[-1][1], Decimal("0.20"))
+
+    def test_complete_channels_with_different_intervals_split_blocks_proportionally(self):
+        other = Channel("meter-001", "channel-second", ChannelKind.GRID_IMPORT)
+        start = datetime(2026, 7, 1, tzinfo=ZONE)
+        rows = readings(start, [1, 1, 1, 1], minutes=30) + readings(start, [2, 2], other)
+        amounts = cost(rows, settings(import_block=block()))
+        self.assertEqual([amount for _, amount in amounts[IMPORT]], [Decimal("0.60"), Decimal("0.80")])
+        self.assertEqual([amount for _, amount in amounts[other]], [Decimal("0.60"), Decimal("0.80")])
+        self.assertEqual(sum(amount for values in amounts.values() for _, amount in values), Decimal("2.80"))
+
+    def test_known_exhausted_or_equal_price_blocks_survive_missing_earlier_readings(self):
+        start = datetime(2026, 7, 1, tzinfo=ZONE)
+        rows = readings(start, [3]) + readings(start + timedelta(hours=2), [1])
+        amounts = cost(rows, settings(import_block=block()))[IMPORT]
+        self.assertEqual([amount for _, amount in amounts], [Decimal("0.80"), Decimal("0.40")])
+        amounts = cost(readings(start + timedelta(hours=2), [1]), settings(import_block=block(after="0.20")))[IMPORT]
+        self.assertEqual(amounts[0][1], Decimal("0.20"))
+
+    def test_shared_hour_allocation_preserves_decimal_total_and_zero_channels(self):
+        start = datetime(2026, 7, 1, tzinfo=ZONE)
+        channels = [Channel("meter-001", f"channel-{index}", ChannelKind.GRID_IMPORT) for index in range(4)]
+        rows = [row for index, channel in enumerate(channels) for row in readings(start, [1 if index < 3 else 0], channel)]
+        amounts = cost(rows, settings(import_block=block()))
+        self.assertEqual(sum(values[0][1] for values in amounts.values()), Decimal("0.80"))
+        self.assertEqual(amounts[channels[-1]][0][1], 0)
+
+    def test_dst_fetch_padding_does_not_expand_the_target_cycles(self):
+        for day, expected in ((date(2026, 4, 5), 25), (date(2026, 10, 4), 47), (date(2026, 10, 6), 48)):
+            with self.subTest(day=day):
+                config = settings(import_block=block())
+                first, last, periods = tariff.history_periods(config, day, day, date(2026, 11, 1))
+                begin = datetime.combine(first, datetime.min.time(), timezone(timedelta(hours=10)))
+                rows = readings(begin, [1] * (((last-first).days+1)*24))
+                source = hourly.hourly_energy(rows)
+                targets = {IMPORT: [(hour, value) for hour, value in source[IMPORT]
+                                    if any(left <= hour < right for left, right in periods["grid_import"])]}
+                amounts = tariff.hourly_costs(rows, targets, config, source_hours=source)[IMPORT]
+                self.assertEqual(len(targets[IMPORT]), expected)
+                self.assertEqual(len(amounts), expected)
+
+    def test_only_active_calendars_expand_history_and_corrections_reach_later_plans(self):
+        config = settings(import_block=block("monthly"))
+        later = deepcopy(config["plans"][0])
+        later["effective_from"] = datetime(2026, 7, 15, tzinfo=ZONE).isoformat()
+        later["import_price"] = "0.30"
+        later["import_block"]["anchor"] = "2026-07-15"
+        config["plans"].append(later)
+        first, last, periods = tariff.history_periods(config, date(2026, 7, 10), date(2026, 7, 10), date(2026, 9, 1))
+        self.assertEqual((first, last), (date(2026, 7, 1), date(2026, 7, 14)))
+        self.assertEqual(sum((right-left).total_seconds()/3600 for left,right in periods["grid_import"]), 14*24)
+        # With the same reset calendar, a correction also changes the remaining
+        # allowance under the later rate, so reconcile through that cycle's end.
+        later["import_block"]["anchor"] = "2026-01-01"
+        first, last, _ = tariff.history_periods(config, date(2026, 7, 10), date(2026, 7, 10), date(2026, 9, 1))
+        self.assertEqual((first, last), (date(2026, 7, 1), date(2026, 7, 31)))
+        later.pop("import_block")
+        later["model"] = "flat"
+        later["bands"] = []
+        first, last, _ = tariff.history_periods(config, date(2026, 8, 10), date(2026, 8, 11), date(2026, 9, 1))
+        self.assertEqual((first, last), (date(2026, 8, 10), date(2026, 8, 11)))
 
     def test_zero_optional_controlled_load_and_invalid_prices(self):
         start = datetime(2026, 7, 1, tzinfo=ZONE)

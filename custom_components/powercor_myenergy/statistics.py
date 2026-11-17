@@ -19,7 +19,7 @@ from .const import DOMAIN
 from .hourly import hourly_energy
 from .myenergy import DataUnavailable
 from .myenergy.model import ChannelKind
-from .tariff import hourly_costs, interval_price, plan_at, request_dates
+from .tariff import history_periods, hourly_costs, interval_price, plan_at
 
 AEST = timezone(timedelta(hours=10), "AEST")
 
@@ -47,7 +47,7 @@ async def async_import_history(hass, coordinator, start, end, *, meters=None):
         registers = {plan["controlled_load_register"]: ChannelKind.CONTROLLED_LOAD
                      for plan in settings.get("plans", []) if plan.get("controlled_load_register")}
         reading_options = {"channel_kinds": registers} if registers else {}
-        fetch_start, fetch_end = request_dates(settings, start, end, datetime.now(AEST).date())
+        fetch_start, fetch_end, periods = history_periods(settings, start, end, datetime.now(AEST).date())
         readings = []
         skipped_meters = 0
         if meters is None:
@@ -63,13 +63,22 @@ async def async_import_history(hass, coordinator, start, end, *, meters=None):
                     )
                     readings.extend(batch)
                 except DataUnavailable:
-                    unavailable = True
+                    chunk_left = datetime.combine(cursor, datetime.min.time(), AEST).astimezone(timezone.utc)
+                    chunk_right = datetime.combine(chunk_end + timedelta(days=1), datetime.min.time(), AEST).astimezone(timezone.utc)
+                    # Missing context is reflected in block-price certainty. It
+                    # must not mark fully retrieved target hours as unavailable.
+                    unavailable = unavailable or any(chunk_left < right and left < chunk_right
+                                       for ranges in periods.values() for left, right in ranges)
                 cursor = chunk_end + timedelta(days=1)
             skipped_meters += int(unavailable)
 
         try:
-            hours = hourly_energy(readings)
-            costs = hourly_costs(readings, hours, settings) if settings else {}
+            source_hours = hourly_energy(readings)
+            hours = {channel: [(hour, energy) for hour, energy in values
+                               if any(left <= hour < right for left, right in periods[channel.kind.value])]
+                     for channel, values in source_hours.items()}
+            hours = {channel: values for channel, values in hours.items() if values}
+            costs = hourly_costs(readings, hours, settings, source_hours=source_hours) if settings else {}
         except ValueError as err:
             raise HomeAssistantError(f"Historical intervals could not be priced or grouped: {err}") from err
 
@@ -80,13 +89,14 @@ async def async_import_history(hass, coordinator, start, end, *, meters=None):
                for item in existing.values()):
             raise HomeAssistantError("Existing statistics have incompatible source or units")
 
-        requested_hours = ((fetch_end - fetch_start).days + 1) * 24
-        unimported = sorted(statistic_id(channel) for channel in {r.channel for r in readings} - hours.keys())
+        target_readings = [reading for reading in readings if any(
+            left <= reading.start < right for left, right in periods[reading.channel.kind.value])]
+        unimported = sorted(statistic_id(channel) for channel in {r.channel for r in target_readings} - hours.keys())
         result = {
             "streams": {}, "cost_streams": {}, "skipped_meters": skipped_meters,
             "start_date": fetch_start.isoformat(), "end_date": fetch_end.isoformat(),
             "unimported_streams": unimported,
-            "latest_source_timestamp": max((r.end for r in readings if r.kwh is not None), default=None),
+            "latest_source_timestamp": max((r.end for r in target_readings if r.kwh is not None), default=None),
             "incomplete_hours": 0,
         }
         if result["latest_source_timestamp"] is not None:
@@ -107,6 +117,8 @@ async def async_import_history(hass, coordinator, start, end, *, meters=None):
             if rows:
                 pending.append((metadata, rows))
             source = dict(values)
+            requested_hours = sum(int((right - left).total_seconds() / 3600)
+                                  for left, right in periods[channel.kind.value])
             result["streams"][stream_id] = {
                 "hours": len(values), "kwh": float(sum(source.values())),
                 "incomplete_hours": requested_hours - len(values),
