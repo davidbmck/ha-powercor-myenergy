@@ -7,7 +7,7 @@ Home Assistant integration for retrospective electricity readings from the
 consumption and solar export into the Energy dashboard. This is interval data,
 not real-time power monitoring.
 
-Install [release 0.2.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.2.0)
+Install [release 0.3.0](https://github.com/davidbmck/ha-powercor-myenergy/releases/tag/0.3.0)
 as a custom repository. Default catalogue listing is a separate follow-up.
 
 [![Open in Marketplace or HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=davidbmck&repository=ha-powercor-myenergy&category=integration)
@@ -108,7 +108,7 @@ established. The portal uses undocumented behaviour that can change.
 ## Development
 
 Install `requirements.txt`, then run `python -m unittest discover -s tests`.
-`python tools/build_release.py --tag 0.2.0` produces the self-contained release
+`python tools/build_release.py --tag 0.3.0` produces the self-contained release
 ZIP. `python tools/test_ha.py --image <installed-image>` runs offline HA and
 Recorder checks from that artifact in a disposable Docker container. See
 [developer validation](docs/home-assistant.md#disposable-docker-validation).
