@@ -96,7 +96,7 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
         previous = self._data.get(CONF_IMAP, {})
         defaults = {
             "host": "imap.gmail.com", "username": self._data.get(CONF_USERNAME, ""),
-            "folder": "INBOX", "sender": "", "recipient": self._data.get(CONF_USERNAME, ""),
+            "folder": "INBOX", "sender": "no-reply@powercor.com.au", "recipient": "",
             "subject": "{code} is your one-time verification code.",
         }
         schema = {}
