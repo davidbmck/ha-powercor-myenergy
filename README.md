@@ -59,8 +59,13 @@ under **Developer tools → Actions**. Enter inclusive completed dates in fixed
 
 Incomplete hours are omitted rather than filled with zero. An hour previously
 imported that later becomes incomplete remains in Recorder. Controlled-load
-suffixes are not inferred automatically. Tariffs and billing are outside this
-integration's scope.
+suffixes are not inferred automatically. Optional usage-cost tracking supports
+flat prices, time-of-use/free-midday/overnight schedules and two-block import or
+export pricing. Configure dated prices through the integration's **Configure**
+options; see [usage costs and price changes](docs/home-assistant.md#usage-costs-and-export-credits).
+The native Energy static-price option remains disabled for external statistics;
+select the integration's matching cost/credit statistics instead. Full bill
+calculation, including supply fees and demand charges, is outside scope.
 
 ## Updates and migration
 

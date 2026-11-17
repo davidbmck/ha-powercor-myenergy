@@ -45,5 +45,157 @@
       "already_configured": "This myEnergy account is already configured.",
       "wrong_account": "Use the same myEnergy account when reauthenticating."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energy usage prices",
+        "description": "Enter {currency} per kWh (for AUD, 0.30 means 30 cents). Edit the prices and save; existing hours and block allowances stay the same. New prices start on the chosen date, preserving earlier prices. To change provider, edit these prices and optionally change the plan type or hours. Leave unused export blank; zero is valid. Costs exclude supply fees and demand charges.",
+        "data": {
+          "import_price": "Import price (standard / off-peak / first block) per kWh",
+          "export_price": "Export credit per kWh (optional)",
+          "advanced": "Change plan type, hours or special settings",
+          "effective_date": "New prices start on",
+          "operation": "What would you like to do?",
+          "peak_price": "Peak price per kWh",
+          "shoulder_price": "Shoulder / solar-soak price per kWh",
+          "overnight_price": "Overnight price per kWh",
+          "import_after_price": "Import price per kWh after allowance",
+          "export_after_price": "Export price per kWh after allowance",
+          "extra_overnight_price": "Extra overnight price per kWh",
+          "controlled_load_price": "Controlled-load price per kWh"
+        }
+      },
+      "edit_plan": {
+        "title": "Choose prices to correct",
+        "description": "You will confirm historical repricing before saving. Existing effective dates stay fixed.",
+        "data": {
+          "plan": "Pricing period"
+        }
+      },
+      "add_plan": {
+        "title": "Choose your energy plan",
+        "description": "Choose a preset and check its hours against your bill. Existing rates and hours are prefilled, so a provider change only needs the values that differ. Prices start on the date chosen on the previous screen.",
+        "data": {
+          "model": "Import pricing",
+          "export_model": "Solar export pricing",
+          "timezone": "Clock used by your plan",
+          "customise_times": "Change the preset times or weekdays",
+          "extras": "Add controlled-load or an extra overnight rate"
+        }
+      },
+      "rates": {
+        "title": "Enter your prices",
+        "description": "Enter {currency} per kWh, including any tax you want tracked (e.g. 0.30 means 30 cents for AUD). Zero is valid. Free midday is priced at zero. Blocks share their allowance across a meter’s channels of the same direction. Monthly/quarterly cycles repeat from the billing-cycle date; month-end dates clamp to the last day.",
+        "data": {
+          "import_price": "Standard / off-peak import price per kWh",
+          "export_price": "Export credit per kWh (first block, if stepped)",
+          "peak_price": "Peak price per kWh",
+          "shoulder_price": "Shoulder / solar-soak price per kWh",
+          "overnight_price": "Overnight price per kWh",
+          "import_block_kwh": "Import first-block allowance (kWh)",
+          "import_after_price": "Import price per kWh after allowance",
+          "import_reset": "Import allowance resets",
+          "import_anchor": "Import billing-cycle start date (ignored for daily)",
+          "export_block_kwh": "Export first-block allowance (kWh)",
+          "export_after_price": "Export price per kWh after allowance",
+          "export_reset": "Export allowance resets",
+          "export_anchor": "Export billing-cycle start date (ignored for daily)"
+        }
+      },
+      "times": {
+        "title": "Match the hours on your bill",
+        "description": "Use five-minute boundaries. Ends are exclusive. Overnight windows wrap into the next day. Matching periods use this priority: free midday, peak, shoulder; the standard price covers remaining hours. Peak overrides the broader shoulder window, so weekends can remain shoulder-priced. Only enable periods your plan actually uses.",
+        "data": {
+          "peak_start": "Peak starts",
+          "peak_end": "Peak ends",
+          "peak_days": "Peak days",
+          "shoulder_start": "Shoulder / solar soak starts",
+          "shoulder_end": "Shoulder / solar soak ends",
+          "shoulder_days": "Shoulder / solar soak days",
+          "free_start": "Free midday starts",
+          "free_end": "Free midday ends",
+          "free_days": "Free midday days",
+          "overnight_start": "Overnight starts",
+          "overnight_end": "Overnight ends",
+          "overnight_days": "Overnight days"
+        }
+      },
+      "extras": {
+        "title": "Optional special rates",
+        "description": "Prices are {currency}/kWh. Leave unused prices blank. The extra overnight period applies every day and overrides other time bands; keep it separate from free midday hours. Controlled load uses only a separately identified channel and never assumes general usage is controlled load. Extra overnight pricing cannot be combined with block import pricing. If pricing controlled load, enter the register confirmed in your NEM12 export or by your distributor; E2 is not assumed to mean controlled load.",
+        "data": {
+          "controlled_load_price": "Separate controlled-load price per kWh (optional)",
+          "extra_overnight_price": "Extra overnight price per kWh (optional)",
+          "extra_overnight_start": "Extra overnight starts",
+          "extra_overnight_end": "Extra overnight ends",
+          "controlled_load_register": "Confirmed controlled-load register (E2–E9)"
+        }
+      },
+      "confirm": {
+        "title": "Confirm historical correction",
+        "description": "Replace the saved prices from {date} until the next saved plan. This intentionally reprices that period when its original readings are imported again. Recent history refreshes automatically; reimport older dates with the import history action."
+      }
+    },
+    "error": {
+      "date_order": "Choose a date later than the last saved pricing date. Use “Correct a saved pricing period” to fix existing prices.",
+      "invalid_price": "Enter finite, nonnegative prices and a first-block allowance greater than zero.",
+      "invalid_time": "Choose different start and end times, at five-minute boundaries, and at least one day.",
+      "invalid_extras": "Check prices, distinct times at five-minute boundaries, and the confirmed controlled-load register (E2–E9). Block import pricing cannot have an extra overnight rate.",
+      "cannot_disable": "Keep previously configured export and controlled-load prices; use zero for a zero-priced period."
+    },
+    "abort": {
+      "currency_changed": "Home Assistant’s currency differs from the saved costs. Restore the original currency before changing prices; existing money statistics cannot be safely relabelled."
+    }
+  },
+  "selector": {
+    "model": {
+      "options": {
+        "flat": "Flat rate — one price all day",
+        "two_rate": "Peak / off-peak — example 4–9 pm daily peak",
+        "three_rate": "Peak / shoulder / off-peak — Victorian flexible example",
+        "free_midday": "Free midday — example 11 am–2 pm, flat otherwise",
+        "midday_saver": "Midday Power Saver — free, solar soak, peak, off-peak",
+        "overnight": "Cheap overnight / EV — example midnight–6 am",
+        "block": "Two blocks — first Y kWh, then another price"
+      }
+    },
+    "export_model": {
+      "options": {
+        "none": "Do not track export credits",
+        "flat": "Fixed export credit",
+        "block": "Two-block export credit"
+      }
+    },
+    "timezone": {
+      "options": {
+        "Australia/Melbourne": "Victorian local time (follows daylight saving)",
+        "Etc/GMT-10": "Fixed AEST (no daylight saving)"
+      }
+    },
+    "reset": {
+      "options": {
+        "daily": "Daily at midnight",
+        "monthly": "Monthly from billing-cycle start date",
+        "quarterly": "Every three months from billing-cycle start date"
+      }
+    },
+    "days": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    },
+    "operation": {
+      "options": {
+        "new": "Set new prices from this date",
+        "edit": "Correct prices in a saved historical period"
+      }
+    }
   }
 }

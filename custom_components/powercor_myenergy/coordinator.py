@@ -103,6 +103,7 @@ class MyEnergyCoordinator(DataUpdateCoordinator):
                     if result else previous.get("sync_complete"),
                     "skipped_meters": (result or {}).get("skipped_meters", previous.get("skipped_meters")),
                     "incomplete_hours": (result or {}).get("incomplete_hours", previous.get("incomplete_hours")),
+                    "unpriced_hours": (result or {}).get("unpriced_hours", previous.get("unpriced_hours")),
                     "unresolved_history_start": saved.get(CONF_RETRY_START)}
         except (ConfigEntryAuthFailed, UpdateFailed):
             raise
@@ -119,14 +120,14 @@ class MyEnergyCoordinator(DataUpdateCoordinator):
         except HomeAssistantError as err:
             raise UpdateFailed("Historical myEnergy sync did not complete") from err
 
-    async def async_authenticated_call(self, operation, *args):
+    async def async_authenticated_call(self, operation, *args, **kwargs):
         """Run one protected client operation, logging in once if it expired."""
         async with self.auth_lock:
             try:
-                return await operation(*args)
+                return await operation(*args, **kwargs)
             except AuthenticationExpired:
                 await self._async_login()
-                result = await operation(*args)
+                result = await operation(*args, **kwargs)
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data={**self.config_entry.data, CONF_SESSION: self.client.export_state()},

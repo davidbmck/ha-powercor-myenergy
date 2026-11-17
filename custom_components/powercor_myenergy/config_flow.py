@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 
 from .const import CONF_AUTOMATIC, CONF_IMAP, CONF_SESSION, DOMAIN
 from .coordinator import async_create_session
+from .tariff_flow import TariffOptionsFlow
 from .myenergy import (
     AuthenticationError, MailboxError, MyEnergyClient, MyEnergyError, TransportError,
 )
@@ -22,6 +23,11 @@ PASSWORD = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextS
 
 class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return TariffOptionsFlow()
 
     def __init__(self):
         self._data = {}

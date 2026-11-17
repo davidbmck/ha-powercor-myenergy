@@ -91,3 +91,83 @@ class RecorderTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CostRecorderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cost_backfill_correction_and_repeated_import_after_restart(self):
+        from tempfile import TemporaryDirectory
+        from zoneinfo import ZoneInfo
+        from custom_components.powercor_myenergy.statistics import cost_statistic_id
+        from homeassistant.components.energy.validate import _async_validate_cost_stat, ValidationIssues
+
+        with TemporaryDirectory(dir="/config") as directory:
+            config = {"homeassistant": {"name": "Synthetic cost test", "country": "AU", "currency": "AUD", "time_zone": "Australia/Melbourne"}, "recorder": {}}
+            local_start = datetime(2026, 7, 1, tzinfo=ZoneInfo("Australia/Melbourne"))
+            start = local_start.astimezone(timezone.utc)
+            imported = Channel("meter-002", "c" * 64, ChannelKind.GRID_IMPORT)
+            exported = Channel("meter-002", "d" * 64, ChannelKind.GRID_EXPORT)
+            options = {"tariff": {"currency": "AUD", "plans": [{
+                "effective_from": None, "timezone": "Australia/Melbourne", "bands": [],
+                "import_price": "0.20", "export_price": "0.05",
+                "import_block": {"kwh": "2", "after_price": "0.40", "reset": "daily", "anchor": "2026-01-01"},
+            }]}}
+            def source(first=1):
+                return [Reading(imported, start, start + timedelta(hours=1), Decimal(first)),
+                        Reading(imported, start + timedelta(hours=1), start + timedelta(hours=2), Decimal(2)),
+                        Reading(imported, start + timedelta(days=1), start + timedelta(days=1, hours=1), Decimal(1)),
+                        Reading(exported, start, start + timedelta(hours=1), Decimal(2))]
+
+            client = SimpleNamespace(get_meters=AsyncMock(return_value=[object()]), get_readings=AsyncMock(return_value=source()))
+            coordinator = SimpleNamespace(client=client, sync_lock=asyncio.Lock(), config_entry=SimpleNamespace(options=options),
+                                          async_authenticated_call=lambda operation, *args: operation(*args))
+            ids = {cost_statistic_id(imported), cost_statistic_id(exported)}
+            import_id = cost_statistic_id(imported)
+
+            async def query(hass):
+                return await get_instance(hass).async_add_executor_job(
+                    statistics_during_period, hass, start, start + timedelta(days=2), ids, "hour", None, {"state", "sum", "change"})
+
+            hass = HomeAssistant(directory)
+            loader.async_setup(hass)
+            try:
+                await bootstrap.async_from_config_dict(config, hass)
+                await hass.async_start()
+                # Import a later day first, then backfill the earlier block period.
+                client.get_readings.return_value = source()[2:3]
+                coordinator.config_entry.options = {}
+                unpriced = await async_import_history(hass, coordinator, date(2026, 7, 2), date(2026, 7, 2))
+                self.assertFalse(unpriced["cost_streams"])
+                coordinator.config_entry.options = options
+                client.get_readings.return_value = source()
+                result = await async_import_history(hass, coordinator, date(2026, 7, 1), date(2026, 7, 2))
+                rows = await query(hass)
+                self.assertEqual([round(row["sum"], 9) for row in rows[import_id]], [0.2, 0.8, 1.0])
+                self.assertEqual([round(row["change"], 9) for row in rows[import_id]], [0.2, 0.6, 0.2])
+                self.assertEqual(set(result["cost_streams"]), ids)
+                client.get_readings.return_value = source(2)
+                await async_import_history(hass, coordinator, date(2026, 7, 1), date(2026, 7, 1))
+                rows = await query(hass)
+                self.assertEqual([round(row["sum"], 9) for row in rows[import_id]], [0.4, 1.2, 1.4])
+                metadata = await async_list_statistic_ids(hass, statistic_ids=ids)
+                self.assertTrue(all(item["statistics_unit_of_measurement"] == "AUD" and item["has_sum"] and item["unit_class"] is None for item in metadata))
+                issues = ValidationIssues()
+                for item in ids:
+                    _async_validate_cost_stat(hass, {item: (1, {})}, item, issues)
+                self.assertFalse(issues.issues)
+            finally:
+                await hass.async_stop()
+
+            hass = HomeAssistant(directory)
+            loader.async_setup(hass)
+            try:
+                await bootstrap.async_from_config_dict(config, hass)
+                await hass.async_start()
+                # A fresh coordinator has no in-memory consumption counters.
+                coordinator.sync_lock = asyncio.Lock()
+                repeated = await async_import_history(hass, coordinator, date(2026, 7, 1), date(2026, 7, 2))
+                self.assertTrue(all(stream["changed_hours"] == 0 for stream in repeated["streams"].values()))
+                self.assertTrue(all(stream["changed_hours"] == 0 for stream in repeated["cost_streams"].values()))
+                rows = await query(hass)
+                self.assertEqual([round(row["sum"], 9) for row in rows[import_id]], [0.4, 1.2, 1.4])
+            finally:
+                await hass.async_stop()

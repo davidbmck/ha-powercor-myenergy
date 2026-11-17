@@ -78,7 +78,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.client.restore_state.assert_called_once_with(self.entry.data["session"])
         self.assertEqual(set(data), {"last_update", "meter_count", "latest_source_timestamp",
                                      "last_successful_sync", "sync_complete", "skipped_meters", "incomplete_hours",
-                                     "unresolved_history_start"})
+                                     "unresolved_history_start", "unpriced_hours"})
         self.assertEqual(data["meter_count"], 1)
         self.assertIsNotNone(data["last_update"].tzinfo)
         self.client.login.assert_not_called()
@@ -328,7 +328,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         result = await async_get_config_entry_diagnostics(self.hass, self.entry)
         self.assertEqual(set(result), {"automatic_login", "last_update_success", "last_update", "meter_count",
                                        "last_successful_sync", "sync_complete", "skipped_meters", "incomplete_hours",
-                                       "unresolved_history_start"})
+                                       "unresolved_history_start", "unpriced_hours"})
         for sensitive in (LOGIN["username"], LOGIN["password"], MAILBOX["password"]):
             self.assertNotIn(sensitive, str(result))
 
@@ -392,6 +392,30 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["skipped_meters"], 1)
         self.assertEqual(result["streams"], {})
         self.recorder.return_value.async_block_till_done.assert_not_awaited()
+
+    async def test_cost_currency_or_existing_units_mismatch_prevents_all_writes(self):
+        self.hass.config.currency = "AUD"
+        self.entry.options = {"tariff": {"currency": "EUR", "plans": []}}
+        self.client.get_readings = AsyncMock(return_value=[])
+        with patch(f"{PREFIX}.statistics.async_add_external_statistics") as add:
+            with self.assertRaisesRegex(HomeAssistantError, "currency changed"):
+                await async_import_history(self.hass, self.coordinator(), date(2026, 7, 1), date(2026, 7, 1))
+            add.assert_not_called()
+        self.client.get_readings.assert_not_awaited()
+        self.entry.options["tariff"] = {"currency": "AUD", "plans": [{
+            "effective_from": None, "timezone": "Australia/Melbourne", "bands": [],
+            "import_price": "0.30", "export_price": None,
+        }]}
+        start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        channel = Channel("meter-001", "a" * 64, ChannelKind.GRID_IMPORT)
+        self.client.get_readings.return_value = [Reading(channel, start, start + timedelta(hours=1), Decimal(1))]
+        with (patch(f"{PREFIX}.statistics.async_list_statistic_ids", new_callable=AsyncMock,
+                    return_value=[{"statistic_id": f"powercor_myenergy:cost_{'a' * 64}_grid_import",
+                                   "source": "powercor_myenergy", "statistics_unit_of_measurement": "EUR"}]),
+              patch(f"{PREFIX}.statistics.async_add_external_statistics") as add):
+            with self.assertRaisesRegex(HomeAssistantError, "incompatible source or units"):
+                await async_import_history(self.hass, self.coordinator(), date(2026, 7, 1), date(2026, 7, 1))
+            add.assert_not_called()
 
     async def test_historical_import_reconciles_change_and_is_idempotent(self):
         start = datetime(2026, 7, 1, tzinfo=timezone.utc)
