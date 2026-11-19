@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     CONF_AUTOMATIC, CONF_IMAP, CONF_LAST_LOGIN, CONF_SESSION, DOMAIN,
-    LOGIN_COOLDOWN, UPDATE_INTERVAL, HISTORY_INTERVAL, FIRST_SYNC_DAYS, RECENT_SYNC_DAYS,
+    LOGIN_COOLDOWN, UPDATE_INTERVAL, RETRY_INTERVAL, HISTORY_INTERVAL, FIRST_SYNC_DAYS, RECENT_SYNC_DAYS,
     MAX_SYNC_DAYS,
     CONF_LAST_SYNC, CONF_RETRY_START,
 )
@@ -95,6 +95,7 @@ class MyEnergyCoordinator(DataUpdateCoordinator):
             if last_sync_text:
                 saved[CONF_LAST_SYNC] = last_sync_text
             self.hass.config_entries.async_update_entry(self.config_entry, data=saved)
+            self.update_interval = UPDATE_INTERVAL
             previous = self.data or {}
             return {"last_update": now, "meter_count": len(meters),
                     "last_successful_sync": last_sync_text,
@@ -114,8 +115,10 @@ class MyEnergyCoordinator(DataUpdateCoordinator):
                 raise ConfigEntryAuthFailed("Update the OTP mailbox credentials") from err
             raise UpdateFailed("Automatic email verification could not complete; it will be retried") from err
         except TransportError as err:
+            self.update_interval = RETRY_INTERVAL
             raise UpdateFailed("myEnergy or the OTP mailbox is temporarily unavailable") from err
         except MyEnergyError as err:
+            self.update_interval = RETRY_INTERVAL
             raise UpdateFailed("Unexpected response from myEnergy") from err
         except HomeAssistantError as err:
             raise UpdateFailed("Historical myEnergy sync did not complete") from err

@@ -25,6 +25,9 @@ Manual verification is available during setup and reauthentication. That mode
 requires intervention when the session expires. Failed portal credentials or
 rejected mailbox credentials start HA's reauthentication flow, where automatic
 or manual verification can be selected again. OTP values are never persisted.
+For a routine myEnergy password change, open the integration's **Reconfigure**
+action, enter the new password, and complete verification. The existing mailbox
+password can be left blank to keep it.
 
 The [completed session investigation](authentication-session.md)
 demonstrated seven days of access with 80-minute checks, fresh context, cookie
@@ -32,7 +35,8 @@ adoption and renewal. It did not establish three months of access, so this
 integration also supports fresh login and automatic IMAP verification when
 renewal fails. A refresh makes at most one login attempt; a persisted 15-minute
 cooldown prevents setup retries or restarts from repeatedly requesting codes.
-Temporary network/mailbox failures retry through HA; unexpected service changes
+Temporary portal transport or HTTP failures retry after 10 minutes; a successful
+refresh restores the 80-minute interval. Unexpected service changes
 remain distinct from authentication expiry and do not trigger password retries.
 
 The diagnostic last-update sensor records the last successful protected refresh.

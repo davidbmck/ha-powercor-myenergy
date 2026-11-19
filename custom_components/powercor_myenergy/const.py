@@ -8,6 +8,7 @@ CONF_AUTOMATIC = "automatic_login"
 CONF_SESSION = "session"
 CONF_LAST_LOGIN = "last_login_attempt"
 UPDATE_INTERVAL = timedelta(minutes=80)
+RETRY_INTERVAL = timedelta(minutes=10)
 HISTORY_INTERVAL = timedelta(hours=6)
 LOGIN_COOLDOWN = timedelta(minutes=15)
 FIRST_SYNC_DAYS = 30

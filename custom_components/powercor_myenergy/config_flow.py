@@ -1,4 +1,4 @@
-"""UI setup and reauthentication; OTPs remain transient flow input."""
+"""UI setup and credential changes; OTPs remain transient flow input."""
 
 import asyncio
 import hashlib
@@ -68,15 +68,23 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
         self._data = dict(entry_data)
         return await self.async_step_user()
 
+    async def async_step_reconfigure(self, user_input=None):
+        if not self._data:
+            self._data = dict(self._get_reconfigure_entry().data)
+        return await self.async_step_user(user_input)
+
+    def _existing_entry(self):
+        return self._get_reauth_entry() if self.source == "reauth" else self._get_reconfigure_entry()
+
     async def async_step_user(self, user_input=None):
         if user_input is not None:
             await self._async_close()
             self._data.update(user_input)
             unique_id = hashlib.sha256(self._data[CONF_USERNAME].strip().casefold().encode()).hexdigest()
             await self.async_set_unique_id(unique_id)
-            if self.source != "reauth":
+            if self.source not in ("reauth", "reconfigure"):
                 self._abort_if_unique_id_configured()
-            elif self._get_reauth_entry().unique_id != unique_id:
+            elif self._existing_entry().unique_id != unique_id:
                 return self.async_abort(reason="wrong_account")
             if self._data[CONF_AUTOMATIC]:
                 return await self.async_step_mailbox()
@@ -92,11 +100,14 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_PASSWORD): PASSWORD,
             vol.Required(CONF_AUTOMATIC, default=self._data.get(CONF_AUTOMATIC, True)): selector.BooleanSelector(),
         })
-        return self.async_show_form(step_id="user", data_schema=schema, errors=self._take_errors())
+        step_id = "reconfigure" if self.source == "reconfigure" else "user"
+        return self.async_show_form(step_id=step_id, data_schema=schema, errors=self._take_errors())
 
     async def async_step_mailbox(self, user_input=None):
         if user_input is not None:
-            self._data[CONF_IMAP] = user_input
+            if not user_input.get(CONF_PASSWORD):
+                user_input = {key: value for key, value in user_input.items() if key != CONF_PASSWORD}
+            self._data[CONF_IMAP] = {**self._data.get(CONF_IMAP, {}), **user_input}
             self._login_task = self.hass.async_create_task(self._async_automatic_login())
             return await self.async_step_authenticate()
         previous = self._data.get(CONF_IMAP, {})
@@ -108,7 +119,8 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = {}
         for key, default in defaults.items():
             schema[vol.Required(key, default=previous.get(key, default))] = EMAIL if key in ("sender", "recipient") else TEXT
-        schema[vol.Required(CONF_PASSWORD)] = PASSWORD
+        schema[vol.Optional(CONF_PASSWORD) if previous.get(CONF_PASSWORD)
+               else vol.Required(CONF_PASSWORD)] = PASSWORD
         return self.async_show_form(step_id="mailbox", data_schema=vol.Schema(schema), errors=self._take_errors())
 
     async def _async_automatic_login(self):
@@ -149,8 +161,8 @@ class MyEnergyConfigFlow(ConfigFlow, domain=DOMAIN):
             await self._async_close()
         unique_id = hashlib.sha256(data[CONF_USERNAME].strip().casefold().encode()).hexdigest()
         await self.async_set_unique_id(unique_id)
-        if self.source == "reauth":
-            entry = self._get_reauth_entry()
+        if self.source in ("reauth", "reconfigure"):
+            entry = self._existing_entry()
             if entry.unique_id != unique_id:
                 return self.async_abort(reason="wrong_account")
             return self.async_update_reload_and_abort(entry, data=data)
