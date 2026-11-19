@@ -14,7 +14,9 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.powercor_myenergy import async_setup
 from custom_components.powercor_myenergy.config_flow import MyEnergyConfigFlow
-from custom_components.powercor_myenergy.const import CONF_LAST_LOGIN, MAX_SYNC_DAYS
+from custom_components.powercor_myenergy.const import (
+    CONF_LAST_LOGIN, MAX_SYNC_DAYS, RETRY_INTERVAL, UPDATE_INTERVAL,
+)
 from custom_components.powercor_myenergy.coordinator import MyEnergyCoordinator
 from custom_components.powercor_myenergy.diagnostics import async_get_config_entry_diagnostics
 from custom_components.powercor_myenergy.statistics import AEST, async_import_history
@@ -237,7 +239,18 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.client.get_meters.side_effect = error
             with self.assertRaises(UpdateFailed):
                 await coordinator._async_update_data()
+            self.assertEqual(coordinator.update_interval, RETRY_INTERVAL)
         self.client.login.assert_not_called()
+
+    async def test_transport_failure_retries_soon_then_restores_normal_cadence(self):
+        coordinator = self.coordinator()
+        self.client.get_meters.side_effect = TransportError()
+        with self.assertRaises(UpdateFailed):
+            await coordinator._async_update_data()
+        self.assertEqual(coordinator.update_interval, RETRY_INTERVAL)
+        self.client.get_meters.side_effect = None
+        await coordinator._async_update_data()
+        self.assertEqual(coordinator.update_interval, UPDATE_INTERVAL)
 
     async def test_mailbox_defaults_use_service_sender_and_require_recipient(self):
         flow = MyEnergyConfigFlow()
@@ -320,6 +333,34 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         saved = flow.async_update_reload_and_abort.call_args.kwargs["data"]
         self.assertEqual(saved["session"], self.client.export_state.return_value)
         self.session.close.assert_awaited_once()
+
+    async def test_reconfigure_validates_new_password_and_keeps_mailbox_password(self):
+        import hashlib
+        flow = MyEnergyConfigFlow()
+        flow.hass = self.hass
+        flow.context = {"source": "reconfigure"}
+        flow.async_set_unique_id = AsyncMock()
+        self.entry.unique_id = hashlib.sha256(LOGIN["username"].encode()).hexdigest()
+        flow._get_reconfigure_entry = Mock(return_value=self.entry)
+        flow.async_update_reload_and_abort = Mock(return_value={"type": "abort", "reason": "reconfigure_successful"})
+        new_login = {**LOGIN, "password": "synthetic-new-password"}
+        with (patch(f"{PREFIX}.config_flow.async_create_session", return_value=self.session),
+              patch(f"{PREFIX}.config_flow.MyEnergyClient", return_value=self.client)):
+            form = await flow.async_step_reconfigure()
+            self.assertEqual(form["step_id"], "reconfigure")
+            mailbox = await flow.async_step_reconfigure(new_login)
+            self.assertEqual(mailbox["step_id"], "mailbox")
+            await flow.async_step_mailbox({key: value for key, value in MAILBOX.items() if key != "password"})
+            await flow._login_task
+            await flow.async_step_authenticate()
+            result = await flow.async_step_finish()
+        self.assertEqual(result["reason"], "reconfigure_successful")
+        self.client.login.assert_awaited_once_with(
+            LOGIN["username"], "synthetic-new-password", imap_config=MAILBOX,
+        )
+        saved = flow.async_update_reload_and_abort.call_args.kwargs["data"]
+        self.assertEqual(saved["password"], "synthetic-new-password")
+        self.assertEqual(saved["imap"]["password"], MAILBOX["password"])
 
     async def test_diagnostics_are_an_allowlist(self):
         coordinator = self.coordinator()

@@ -11,9 +11,18 @@
           "automatic_login": "Retrieve email verification codes automatically"
         }
       },
+      "reconfigure": {
+        "title": "Update myEnergy login",
+        "description": "Enter your current myEnergy password. Complete verification to save it. Leave the mailbox password blank if it has not changed.",
+        "data": {
+          "username": "myEnergy email",
+          "password": "Current myEnergy password",
+          "automatic_login": "Retrieve email verification codes automatically"
+        }
+      },
       "mailbox": {
         "title": "Verification mailbox",
-        "description": "Use a dedicated inbox. For Gmail, enter an app password without spaces. Codes are used only to complete login.",
+        "description": "Use a dedicated inbox. For Gmail, enter an app password without spaces. When updating the login, leave the mailbox password blank to keep it. Codes are used only to complete login.",
         "data": {
           "host": "IMAP server",
           "username": "Mailbox login",
@@ -43,7 +52,7 @@
     },
     "abort": {
       "already_configured": "This myEnergy account is already configured.",
-      "wrong_account": "Use the same myEnergy account when reauthenticating."
+      "wrong_account": "Use the same myEnergy account when updating the login."
     }
   },
   "options": {
